@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ESP32 Emoji Control</title>
+<title>ESP32 Video Control</title>
 <style>
   :root{
     --bg: #0f1117;
@@ -62,37 +62,43 @@
   .grid{
     margin-top: 36px;
     display:grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
-    max-width: 380px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
+    max-width: 360px;
     width:100%;
   }
-  .emoji-btn{
+  .video-btn{
     background: var(--card);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 20px;
-    padding: 18px 0;
-    font-size: 2.2rem;
+    border: 2px solid rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 16px 12px 14px;
     cursor:pointer;
-    transition: transform .12s ease, background .2s ease;
+    transition: transform .12s ease, border-color .2s ease;
     display:flex;
     flex-direction:column;
     align-items:center;
-    gap:6px;
+    gap:10px;
   }
-  .emoji-btn span.label{
-    font-size: 0.7rem;
-    color: var(--muted);
-    font-weight:500;
+  .video-btn img{
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 50%;
+    object-fit: cover;
+    background: white;
   }
-  .emoji-btn:active{ transform: scale(0.92); }
-  .emoji-btn:disabled{
+  .video-btn span.label{
+    font-size: 0.85rem;
+    color: var(--text);
+    font-weight:600;
+  }
+  .video-btn:active{ transform: scale(0.95); }
+  .video-btn:disabled{
     opacity:0.35;
     cursor:not-allowed;
   }
-  .emoji-btn.last-sent{
-    background: linear-gradient(135deg, rgba(108,92,231,0.25), rgba(0,210,211,0.25));
+  .video-btn.last-sent{
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(108,92,231,0.25);
   }
   footer{
     margin-top: 48px;
@@ -105,18 +111,21 @@
 </head>
 <body>
 
-  <h1>🎭 ESP32 Emoji Control</h1>
-  <p class="subtitle">Kontrol emoji di LCD bulat lewat Bluetooth</p>
+  <h1>🎬 ESP32 Video Control</h1>
+  <p class="subtitle">Pilih video yang tampil di LCD lewat Bluetooth</p>
 
   <button id="connectBtn">🔗 Hubungkan ke ESP32</button>
   <div id="status">Belum terhubung</div>
 
   <div class="grid">
-    <button class="emoji-btn" data-id="0" disabled>😀<span class="label">Happy</span></button>
-    <button class="emoji-btn" data-id="1" disabled>😢<span class="label">Sad</span></button>
-    <button class="emoji-btn" data-id="2" disabled>😮<span class="label">Surprised</span></button>
-    <button class="emoji-btn" data-id="3" disabled>😉<span class="label">Wink</span></button>
-    <button class="emoji-btn" data-id="4" disabled>😍<span class="label">Love</span></button>
+    <button class="video-btn" data-id="0" disabled>
+      <img src="video0.png" alt="Video 1">
+      <span class="label">Video 1</span>
+    </button>
+    <button class="video-btn" data-id="1" disabled>
+      <img src="video1.png" alt="Video 2">
+      <span class="label">Video 2</span>
+    </button>
   </div>
 
   <footer>
@@ -131,7 +140,7 @@
 
   const connectBtn = document.getElementById('connectBtn');
   const statusEl   = document.getElementById('status');
-  const emojiBtns  = document.querySelectorAll('.emoji-btn');
+  const videoBtns  = document.querySelectorAll('.video-btn');
 
   let bleDevice = null;
   let bleCharacteristic = null;
@@ -142,7 +151,7 @@
   }
 
   function setButtonsEnabled(enabled) {
-    emojiBtns.forEach(btn => btn.disabled = !enabled);
+    videoBtns.forEach(btn => btn.disabled = !enabled);
   }
 
   async function connectBLE() {
@@ -181,7 +190,7 @@
     bleCharacteristic = null;
   }
 
-  async function sendEmoji(index) {
+  async function sendVideo(index) {
     if (!bleCharacteristic) {
       setStatus('Belum terhubung ke ESP32', 'error');
       return;
@@ -190,8 +199,8 @@
       const data = new Uint8Array([index]);
       await bleCharacteristic.writeValue(data);
 
-      emojiBtns.forEach(b => b.classList.remove('last-sent'));
-      document.querySelector(`.emoji-btn[data-id="${index}"]`).classList.add('last-sent');
+      videoBtns.forEach(b => b.classList.remove('last-sent'));
+      document.querySelector(`.video-btn[data-id="${index}"]`).classList.add('last-sent');
     } catch (err) {
       console.error(err);
       setStatus('Gagal mengirim: ' + err.message, 'error');
@@ -199,8 +208,8 @@
   }
 
   connectBtn.addEventListener('click', connectBLE);
-  emojiBtns.forEach(btn => {
-    btn.addEventListener('click', () => sendEmoji(parseInt(btn.dataset.id)));
+  videoBtns.forEach(btn => {
+    btn.addEventListener('click', () => sendVideo(parseInt(btn.dataset.id)));
   });
 </script>
 
