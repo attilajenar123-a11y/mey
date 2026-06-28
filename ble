@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 Emoji Control</title>
+<style>
+  :root{
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --accent: #6c5ce7;
+    --accent2: #00d2d3;
+    --text: #f1f2f6;
+    --muted: #8a8d98;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    min-height:100vh;
+    background: radial-gradient(circle at top, #1c1f2b, #0f1117 70%);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 32px 16px 60px;
+  }
+  h1{
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+    text-align:center;
+  }
+  p.subtitle{
+    color: var(--muted);
+    margin-top:0;
+    margin-bottom: 28px;
+    text-align:center;
+    font-size: 0.9rem;
+  }
+  #connectBtn{
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color:white;
+    border:none;
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow: 0 6px 20px rgba(108,92,231,0.35);
+    transition: transform .15s ease;
+  }
+  #connectBtn:active{ transform: scale(0.96); }
+
+  #status{
+    margin-top:14px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  #status.connected{ color: #2ecc71; }
+  #status.error{ color: #ff6b6b; }
+
+  .grid{
+    margin-top: 36px;
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 380px;
+    width:100%;
+  }
+  .emoji-btn{
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 18px 0;
+    font-size: 2.2rem;
+    cursor:pointer;
+    transition: transform .12s ease, background .2s ease;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+  .emoji-btn span.label{
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-weight:500;
+  }
+  .emoji-btn:active{ transform: scale(0.92); }
+  .emoji-btn:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+  }
+  .emoji-btn.last-sent{
+    background: linear-gradient(135deg, rgba(108,92,231,0.25), rgba(0,210,211,0.25));
+    border-color: var(--accent);
+  }
+  footer{
+    margin-top: 48px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-align:center;
+    max-width: 320px;
+  }
+</style>
+</head>
+<body>
+
+  <h1>🎭 ESP32 Emoji Control</h1>
+  <p class="subtitle">Kontrol emoji di LCD bulat lewat Bluetooth</p>
+
+  <button id="connectBtn">🔗 Hubungkan ke ESP32</button>
+  <div id="status">Belum terhubung</div>
+
+  <div class="grid">
+    <button class="emoji-btn" data-id="0" disabled>😀<span class="label">Happy</span></button>
+    <button class="emoji-btn" data-id="1" disabled>😢<span class="label">Sad</span></button>
+    <button class="emoji-btn" data-id="2" disabled>😮<span class="label">Surprised</span></button>
+    <button class="emoji-btn" data-id="3" disabled>😉<span class="label">Wink</span></button>
+    <button class="emoji-btn" data-id="4" disabled>😍<span class="label">Love</span></button>
+  </div>
+
+  <footer>
+    Catatan: Web Bluetooth hanya didukung oleh Chrome/Edge (Android &amp; Desktop).
+    Tidak berfungsi di Safari iOS.
+  </footer>
+
+<script>
+  // UUID ini HARUS SAMA dengan yang ada di sketch ESP32 (.ino)
+  const SERVICE_UUID        = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+  const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+  const connectBtn = document.getElementById('connectBtn');
+  const statusEl   = document.getElementById('status');
+  const emojiBtns  = document.querySelectorAll('.emoji-btn');
+
+  let bleDevice = null;
+  let bleCharacteristic = null;
+
+  function setStatus(text, type) {
+    statusEl.textContent = text;
+    statusEl.className = type || '';
+  }
+
+  function setButtonsEnabled(enabled) {
+    emojiBtns.forEach(btn => btn.disabled = !enabled);
+  }
+
+  async function connectBLE() {
+    if (!navigator.bluetooth) {
+      setStatus('Browser ini tidak mendukung Web Bluetooth. Gunakan Chrome/Edge.', 'error');
+      return;
+    }
+
+    try {
+      setStatus('Mencari perangkat...');
+      bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE_UUID] }]
+      });
+
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+      setStatus('Menghubungkan...');
+      const server = await bleDevice.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      bleCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      setStatus('Terhubung ke ' + bleDevice.name, 'connected');
+      setButtonsEnabled(true);
+      connectBtn.textContent = '✅ Terhubung';
+    } catch (err) {
+      console.error(err);
+      setStatus('Gagal terhubung: ' + err.message, 'error');
+      setButtonsEnabled(false);
+    }
+  }
+
+  function onDisconnected() {
+    setStatus('Koneksi terputus', 'error');
+    setButtonsEnabled(false);
+    connectBtn.textContent = '🔗 Hubungkan ke ESP32';
+    bleCharacteristic = null;
+  }
+
+  async function sendEmoji(index) {
+    if (!bleCharacteristic) {
+      setStatus('Belum terhubung ke ESP32', 'error');
+      return;
+    }
+    try {
+      const data = new Uint8Array([index]);
+      await bleCharacteristic.writeValue(data);
+
+      emojiBtns.forEach(b => b.classList.remove('last-sent'));
+      document.querySelector(`.emoji-btn[data-id="${index}"]`).classList.add('last-sent');
+    } catch (err) {
+      console.error(err);
+      setStatus('Gagal mengirim: ' + err.message, 'error');
+    }
+  }
+
+  connectBtn.addEventListener('click', connectBLE);
+  emojiBtns.forEach(btn => {
+    btn.addEventListener('click', () => sendEmoji(parseInt(btn.dataset.id)));
+  });
+</script>
+
+</body>
+</html>
